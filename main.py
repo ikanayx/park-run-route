@@ -4,7 +4,7 @@
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 import requests
 import json
-import demjson
+import demjson3
 import os
 import time
 from math import radians, cos, sin, asin, sqrt, ceil
@@ -25,19 +25,24 @@ output_dir = "output"
 
 def get_park_coordinate():
     park_dict = get_all_country_course_index()
+    park_size = len(park_dict.keys())
+    idx = 0
     for park_code in park_dict.keys():
+        idx = idx + 1
         if file_exists_check(park_code):
+            print(f'[{idx}/{park_size}]route {park_code} exists.')
             continue
 
         google_map_addr = get_google_map_address(park_dict[park_code])
-        print(google_map_addr)
+        # print(google_map_addr)
 
         encoded_json = get_google_route_coordinates(google_map_addr)
-        decoded_json = demjson.decode(encoded_json)
+        decoded_json = demjson3.decode(encoded_json)
 
         json_array = json.loads(decoded_json)
-        repack_and_save_data(park_code, json_array)
+        total = repack_and_save_data(park_code, json_array)
 
+        print(f'route[{idx}/{park_size}] {park_code} found {total}meter coordinates.')
         # in case of google and parkrun website detected and block the program.
         time.sleep(1)
 
@@ -115,23 +120,36 @@ def transform_latlng_to_lnglat(raw_array):
     return obj_array
 
 
+def find_coordinate_list(target):
+    target_type = str(type(target))
+    if target_type.find('list') != -1:
+        item_count = len(target)
+        if item_count > 3:
+            return target
+        else:
+            for idx in range(item_count):
+                res = find_coordinate_list(target[idx])
+                if len(res) != 0:
+                    return res
+            return []
+    else:
+        return []
+
+
 def repack_and_save_data(park_code, json_array):
     arr0 = json_array[1][6][0][12][0][13][0]
     coordinate_array = []
     stop = 0
     for idx1 in range(len(arr0)):
         for idx2 in range(1, 4):
-            if len(arr0[idx1][idx2]) > 0:
-                if idx2 == 2:
-                    coordinate_array = arr0[idx1][idx2][0][0]
-                elif idx2 == 3:
-                    coordinate_array = arr0[idx1][idx2][0][0][0][0]
+            coordinate_array = find_coordinate_list(arr0[idx1][idx2])
+            if len(coordinate_array) != 0:
                 stop = 1
                 break
         if stop == 1:
             break
     if len(coordinate_array) == 0:
-        return
+        return 0
 
     lnglat_object_array = transform_coordinate_to_obj_array(coordinate_array)
 
@@ -153,11 +171,12 @@ def repack_and_save_data(park_code, json_array):
 
     export_json = json.dumps(lnglat_object_array)
     # print(export_json)
-    print(f'route {park_code} total meter: {total}m')
 
     output = open(f'{output_dir}/{park_code}.json', 'w')
     output.write(export_json)
     output.close()
+
+    return total
 
 
 def geodistance(point1, point2, unit='m'):
