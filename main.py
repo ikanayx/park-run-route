@@ -20,15 +20,14 @@ headers = {
               '__utmc=61341485; __utmz=61341485.1681119771.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); '
               '__utmt=1; __utmb=61341485.1.10.1681119771',
 }
+output_dir = "output"
 
 
 def get_park_coordinate():
-    output_dir = "output"
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-
     park_dict = get_all_country_course_index()
     for park_code in park_dict.keys():
+        if file_exists_check(park_code):
+            continue
 
         google_map_addr = get_google_map_address(park_dict[park_code])
         print(google_map_addr)
@@ -37,35 +36,10 @@ def get_park_coordinate():
         decoded_json = demjson.decode(encoded_json)
 
         json_array = json.loads(decoded_json)
-        coordinate_array = json_array[1][6][0][12][0][13][0][0][2][0][0]
+        repack_and_save_data(park_code, json_array)
 
-        lnglat_object_array = transform_coordinate_to_obj_array(coordinate_array)
-
-        # uncomment follow 2 lines if you want to copy the lnglat to mapbox
-        # lnglat_array = transform_latlng_to_lnglat(coordinate_array)
-        # print(json.dumps(lnglat_array))
-
-        total = 0
-        lnglat_object_array[0]['delta'] = 0
-        lnglat_object_array[0]['distance'] = 0
-        for index in range(len(lnglat_object_array) - 1):
-            current = lnglat_object_array[index]
-            nextone = lnglat_object_array[index + 1]
-            meters = geodistance(current, nextone)
-            # print(f'point{index + 1} to point{index + 2}: {distance}m')
-            nextone['delta'] = meters
-            total += meters
-            nextone['distance'] = total
-
-        export_json = json.dumps(lnglat_object_array)
-        print(export_json)
-        print(f'total meter: {total}m')
-
-        output = open(f'{output_dir}/{park_code}.json', 'w')
-        output.write(export_json)
-        output.close()
-
-        time.sleep(1) # in case of google and parkrun website detected and block the program.
+        # in case of google and parkrun website detected and block the program.
+        time.sleep(1)
 
 
 def get_all_country_course_index():
@@ -88,7 +62,7 @@ def get_all_country_course_index():
         country_code = str(props["countrycode"])
         country_index = countries[country_code]["url"]
         course_url = f'https://{country_index}/{park_code}/course'
-        print(f'CoursePageUrl is {course_url}')
+        # print(f'CoursePageUrl is {course_url}')
         park_dict[park_code] = course_url
 
     return park_dict
@@ -110,19 +84,17 @@ def get_google_route_coordinates(url):
     soup = BeautifulSoup(html_doc, "html.parser")  # 指定 "html.parser" 作為解析器
     # print(soup.prettify())  # 把排版後的 html 印出來
     script_array = soup.find_all("script")
-    page_data = ''
+    target_json = ''
     for script in script_array:
         text = str(script.getText())
         flag_start = '_pageData = '
         pos = text.find(flag_start)
         if pos != -1:
-            page_data = text.partition(flag_start)[2]
+            target_json = text.partition(flag_start)[2]
             flag_end = ';'
-            pos = text.find(flag_end)
-            if pos != -1:
-                page_data = page_data.partition(flag_end)[0]
-                break
-    return page_data
+            target_json = target_json.rstrip(flag_end)
+            break
+    return target_json
 
 
 def transform_coordinate_to_obj_array(raw_array):
@@ -143,6 +115,51 @@ def transform_latlng_to_lnglat(raw_array):
     return obj_array
 
 
+def repack_and_save_data(park_code, json_array):
+    arr0 = json_array[1][6][0][12][0][13][0]
+    coordinate_array = []
+    stop = 0
+    for idx1 in range(len(arr0)):
+        for idx2 in range(1, 4):
+            if len(arr0[idx1][idx2]) > 0:
+                if idx2 == 2:
+                    coordinate_array = arr0[idx1][idx2][0][0]
+                elif idx2 == 3:
+                    coordinate_array = arr0[idx1][idx2][0][0][0][0]
+                stop = 1
+                break
+        if stop == 1:
+            break
+    if len(coordinate_array) == 0:
+        return
+
+    lnglat_object_array = transform_coordinate_to_obj_array(coordinate_array)
+
+    # uncomment follow 2 lines if you want to copy the lnglat to mapbox
+    # lnglat_array = transform_latlng_to_lnglat(coordinate_array)
+    # print(json.dumps(lnglat_array))
+
+    total = 0
+    lnglat_object_array[0]['delta'] = 0
+    lnglat_object_array[0]['distance'] = 0
+    for index in range(len(lnglat_object_array) - 1):
+        current = lnglat_object_array[index]
+        nextone = lnglat_object_array[index + 1]
+        meters = geodistance(current, nextone)
+        # print(f'point{index + 1} to point{index + 2}: {distance}m')
+        nextone['delta'] = meters
+        total += meters
+        nextone['distance'] = total
+
+    export_json = json.dumps(lnglat_object_array)
+    # print(export_json)
+    print(f'route {park_code} total meter: {total}m')
+
+    output = open(f'{output_dir}/{park_code}.json', 'w')
+    output.write(export_json)
+    output.close()
+
+
 def geodistance(point1, point2, unit='m'):
     # 经纬度转换成弧度
     lng1, lat1, lng2, lat2 = map(radians, [float(point1['lng']), float(point1['lat']),
@@ -158,6 +175,12 @@ def geodistance(point1, point2, unit='m'):
     return distance
 
 
+def file_exists_check(park_code):
+    return os.path.exists(f'{output_dir}/{park_code}.json')
+
+
 if __name__ == '__main__':
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
     get_park_coordinate()
 
