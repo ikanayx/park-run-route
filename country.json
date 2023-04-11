@@ -1,0 +1,134 @@
+[
+  {
+    "code": "au",
+    "name_en": "Australia",
+    "id": "3",
+    "name_cn": "澳大利亚"
+  },
+  {
+    "code": "at",
+    "name_en": "Austria",
+    "id": "4",
+    "name_cn": "奥地利"
+  },
+  {
+    "code": "ca",
+    "name_en": "Canada",
+    "id": "14",
+    "name_cn": "加拿大"
+  },
+  {
+    "code": "dk",
+    "name_en": "Denmark",
+    "id": "23",
+    "name_cn": "丹麦"
+  },
+  {
+    "code": "sz",
+    "name_en": "Eswatini",
+    "id": "0",
+    "name_cn": "史瓦帝尼(缺失)"
+  },
+  {
+    "code": "fi",
+    "name_en": "Finland",
+    "id": "30",
+    "name_cn": "芬兰"
+  },
+  {
+    "code": "fr",
+    "name_en": "France",
+    "id": "31",
+    "name_cn": "法国"
+  },
+  {
+    "code": "de",
+    "name_en": "Germany",
+    "id": "32",
+    "name_cn": "德国"
+  },
+  {
+    "code": "ie",
+    "name_en": "Ireland",
+    "id": "42",
+    "name_cn": "爱尔兰"
+  },
+  {
+    "code": "it",
+    "name_en": "Italy",
+    "id": "44",
+    "name_cn": "意大利"
+  },
+  {
+    "code": "jp",
+    "name_en": "Japan",
+    "id": "46",
+    "name_cn": "日本"
+  },
+  {
+    "code": "my",
+    "name_en": "Malaysia",
+    "id": "57",
+    "name_cn": "马来西亚"
+  },
+  {
+    "code": "na",
+    "name_en": "Namibia",
+    "id": "0",
+    "name_cn": "納米比亞(缺失)"
+  },
+  {
+    "code": "nl",
+    "name_en": "Netherlands",
+    "id": "64",
+    "name_cn": "荷兰"
+  },
+  {
+    "code": "nz",
+    "name_en": "New Zealand",
+    "id": "65",
+    "name_cn": "纽西兰"
+  },
+  {
+    "code": "no",
+    "name_en": "Norway",
+    "id": "67",
+    "name_cn": "挪威"
+  },
+  {
+    "code": "pl",
+    "name_en": "Poland",
+    "id": "74",
+    "name_cn": "波兰"
+  },
+  {
+    "code": "sg",
+    "name_en": "Singapore",
+    "id": "82",
+    "name_cn": "新加坡"
+  },
+  {
+    "code": "za",
+    "name_en": "South Africa",
+    "id": "85",
+    "name_cn": "南非"
+  },
+  {
+    "code": "se",
+    "name_en": "Sweden",
+    "id": "88",
+    "name_cn": "瑞典"
+  },
+  {
+    "code": "uk",
+    "name_en": "United Kingdom",
+    "id": "97",
+    "name_cn": "英联邦"
+  },
+  {
+    "code": "us",
+    "name_en": "United States of America",
+    "id": "98",
+    "name_cn": "美利坚"
+  }
+]

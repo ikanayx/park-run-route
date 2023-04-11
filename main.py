@@ -1,13 +1,9 @@
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 import requests
 import json
 import demjson3
 import os
 import time
-from math import radians, cos, sin, asin, sqrt, ceil
+from coordinate import update_delta_and_total
 from bs4 import BeautifulSoup
 
 headers = {
@@ -30,21 +26,23 @@ def get_park_coordinate():
     for park_code in park_dict.keys():
         idx = idx + 1
         if file_exists_check(park_code):
-            print(f'[{idx}/{park_size}]route {park_code} exists.')
+            # print(f'[{idx}/{park_size}]route {park_code} exists.')
             continue
+        try:  # 使用 try，測試內容是否正確
+            google_map_addr = get_google_map_address(park_dict[park_code])
+            # print(google_map_addr)
 
-        google_map_addr = get_google_map_address(park_dict[park_code])
-        # print(google_map_addr)
+            encoded_json = get_google_route_coordinates(google_map_addr)
+            decoded_json = demjson3.decode(encoded_json)
 
-        encoded_json = get_google_route_coordinates(google_map_addr)
-        decoded_json = demjson3.decode(encoded_json)
+            json_array = json.loads(decoded_json)
+            total = repack_and_save_data(park_code, json_array)
 
-        json_array = json.loads(decoded_json)
-        total = repack_and_save_data(park_code, json_array)
-
-        print(f'[{idx}/{park_size}]route {park_code} found {total} meter coordinates.')
-        # in case of google and parkrun website detected and block the program.
-        # time.sleep(1)
+            print(f'[{idx}/{park_size}]route {park_code} found {total} meter coordinates.')
+            # in case of google and parkrun website detected and block the program.
+            # time.sleep(1)
+        except Exception as ex:
+            print(f'[{idx}/{park_size}]route {park_code} has ERROR: {ex}')
 
 
 def get_all_country_course_index():
@@ -104,11 +102,24 @@ def get_google_route_coordinates(url):
 
 def transform_coordinate_to_obj_array(raw_array):
     obj_array = []
-    for point in raw_array:
-        lat = point[0][0]
-        lng = point[0][1]
-        obj_array.append({"lng": lng, "lat": lat})
+    for item0 in raw_array:
+        obj_array = obj_array + find_coordinate_values(item0)
     return obj_array
+
+
+def find_coordinate_values(obj):
+    obj_type = str(type(obj[0]))
+    if obj_type.find('float') != -1:
+        lat = obj[0]
+        lng = obj[1]
+        return [{"lng": lng, "lat": lat}]
+    elif obj_type.find('list') != -1:
+        points = []
+        for item in obj:
+            points = points + find_coordinate_values(item)
+        return points
+    else:
+        return []
 
 
 def transform_latlng_to_lnglat(raw_array):
@@ -137,37 +148,37 @@ def find_coordinate_list(target):
 
 
 def repack_and_save_data(park_code, json_array):
-    arr0 = json_array[1][6][0][12][0][13][0]
+    arr1 = json_array[1][6]
     coordinate_array = []
     stop = 0
-    for idx1 in range(len(arr0)):
-        for idx2 in range(1, 4):
-            coordinate_array = find_coordinate_list(arr0[idx1][idx2])
-            if len(coordinate_array) != 0:
-                stop = 1
+    for idx3 in range(len(arr1)):
+        arr0 = arr1[idx3][12][0][13][0]
+        for idx1 in range(len(arr0)):
+            for idx2 in range(1, 4):
+                coordinate_array = find_coordinate_list(arr0[idx1][idx2])
+                if len(coordinate_array) != 0:
+                    stop = 1
+                    break
+            if stop == 1:
                 break
         if stop == 1:
             break
-    if len(coordinate_array) == 0:
-        return 0
-
-    lnglat_object_array = transform_coordinate_to_obj_array(coordinate_array)
 
     # uncomment follow 2 lines if you want to copy the lnglat to mapbox
     # lnglat_array = transform_latlng_to_lnglat(coordinate_array)
     # print(json.dumps(lnglat_array))
 
-    total = 0
-    lnglat_object_array[0]['delta'] = 0
-    lnglat_object_array[0]['distance'] = 0
-    for index in range(len(lnglat_object_array) - 1):
-        current = lnglat_object_array[index]
-        nextone = lnglat_object_array[index + 1]
-        meters = geodistance(current, nextone)
-        # print(f'point{index + 1} to point{index + 2}: {distance}m')
-        nextone['delta'] = meters
-        total += meters
-        nextone['distance'] = total
+    lnglat_object_array = transform_coordinate_to_obj_array(coordinate_array)
+
+    if len(coordinate_array) != 0:
+
+        lnglat_object_array[0]['delta'] = 0
+        lnglat_object_array[0]['distance'] = 0
+        update_delta_and_total(lnglat_object_array)
+
+        total = lnglat_object_array[len(lnglat_object_array) - 1]['distance']
+    else:
+        total = 0
 
     export_json = json.dumps(lnglat_object_array)
     # print(export_json)
@@ -179,21 +190,6 @@ def repack_and_save_data(park_code, json_array):
     return total
 
 
-def geodistance(point1, point2, unit='m'):
-    # 经纬度转换成弧度
-    lng1, lat1, lng2, lat2 = map(radians, [float(point1['lng']), float(point1['lat']),
-                                           float(point2['lng']), float(point2['lat'])])
-    dlon = lng2 - lng1
-    dlat = lat2 - lat1
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-    distance = 2 * asin(sqrt(a)) * 6371 * 1000  # 地球平均半径，6371km
-    if unit == 'km':
-        distance = round(distance / 1000, 3)
-    else:
-        distance = ceil(distance)
-    return distance
-
-
 def file_exists_check(park_code):
     return os.path.exists(f'{output_dir}/{park_code}.json')
 
@@ -202,4 +198,3 @@ if __name__ == '__main__':
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     get_park_coordinate()
-
