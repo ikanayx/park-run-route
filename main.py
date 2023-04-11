@@ -1,10 +1,14 @@
-import requests
 import json
+from os import mkdir, makedirs
+from os.path import exists, join
+
 import demjson3
-import os
-import time
-from coordinate import update_delta_and_total
+import requests
 from bs4 import BeautifulSoup
+
+from coordinate import update_delta_and_total
+from models.country import Country
+from models.park import Park
 
 headers = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -16,66 +20,61 @@ headers = {
               '__utmc=61341485; __utmz=61341485.1681119771.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); '
               '__utmt=1; __utmb=61341485.1.10.1681119771',
 }
-output_dir = "output"
+base_dir = 'parks'
 
 
-def get_park_coordinate():
-    park_dict = get_all_country_course_index()
-    park_size = len(park_dict.keys())
-    idx = 0
-    for park_code in park_dict.keys():
-        idx = idx + 1
-        if file_exists_check(park_code):
-            # print(f'[{idx}/{park_size}]route {park_code} exists.')
-            continue
-        try:  # 使用 try，測試內容是否正確
-            google_map_addr = get_google_map_address(park_dict[park_code])
-            # print(google_map_addr)
-
-            encoded_json = get_google_route_coordinates(google_map_addr)
-            decoded_json = demjson3.decode(encoded_json)
-
-            json_array = json.loads(decoded_json)
-            total = repack_and_save_data(park_code, json_array)
-
-            print(f'[{idx}/{park_size}]route {park_code} found {total} meter coordinates.')
-            # in case of google and parkrun website detected and block the program.
-            # time.sleep(1)
-        except Exception as ex:
-            print(f'[{idx}/{park_size}]route {park_code} has ERROR: {ex}')
+def get_country_list():
+    file = open('country.json', 'r')
+    json_string = file.read()
+    json_array = json.loads(json_string)
+    _list = []
+    for item in json_array:
+        _list.append(Country(item['name_en'], item['name_cn'], item['id'], item['code']))
+    return _list
 
 
-def get_all_country_course_index():
-    park_dict = {}
+def country_list_to_dict(country_list):
+    _dict = {}
+    for country in country_list:
+        _dict[country.id] = country
+    return _dict
+
+
+def get_park_list():
+    park_list = []
 
     file = open('park_run_event.json', 'r')
     json_string = file.read()
     obj = json.loads(json_string)
-    # print(json.dumps(events['countries']['3']['url']))
 
-    countries = obj['countries']
+    _countries = obj['countries']
+    _country_map = country_list_to_dict(get_country_list())
     # country_codes = countries.keys()
     # for country_code in country_codes:
     #     print(f'{country_code}\'s url: {countries[country_code]["url"]}')
 
     parks = obj['events']['features']
     for park in parks:
-        props = park["properties"]
-        park_code = props["eventname"]
-        country_code = str(props["countrycode"])
-        country_index = countries[country_code]["url"]
-        course_url = f'https://{country_index}/{park_code}/course'
-        # print(f'CoursePageUrl is {course_url}')
-        park_dict[park_code] = course_url
+        _props = park["properties"]
+        _park_code = _props["eventname"]
+        _country_id = str(_props["countrycode"])
+        _course_url = f'https://{_countries[_country_id]["url"]}/{_park_code}/course'
+        _park_obj = Park(_park_code, _country_map[_country_id].code, _course_url, 0)
+        park_list.append(_park_obj)
 
-    return park_dict
+    return park_list
 
 
-def get_google_map_address(url):
+def get_google_map_address(country_code, park_code, url):
     resp = requests.get(url, headers=headers)
     html_doc = resp.text  # text 屬性就是 html 檔案
     soup = BeautifulSoup(html_doc, "html.parser")  # 指定 "html.parser" 作為解析器
     # print(soup.prettify())  # 把排版後的 html 印出來
+
+    html_file = open(f'{base_dir}/{country_code}/{park_code}/course.html', 'w')
+    html_file.write(soup.prettify())
+    html_file.close()
+
     iframe_node = soup.find("iframe")
     google_map_address = iframe_node.get("src")
     return google_map_address
@@ -100,11 +99,20 @@ def get_google_route_coordinates(url):
     return target_json
 
 
-def transform_coordinate_to_obj_array(raw_array):
-    obj_array = []
-    for item0 in raw_array:
-        obj_array = obj_array + find_coordinate_values(item0)
-    return obj_array
+def find_coordinate_list(target):
+    target_type = str(type(target))
+    if target_type.find('list') != -1:
+        item_count = len(target)
+        if item_count > 3:
+            return target
+        else:
+            for idx in range(item_count):
+                res = find_coordinate_list(target[idx])
+                if len(res) != 0:
+                    return res
+            return []
+    else:
+        return []
 
 
 def find_coordinate_values(obj):
@@ -122,6 +130,13 @@ def find_coordinate_values(obj):
         return []
 
 
+def transform_coordinate_to_obj_array(raw_array):
+    obj_array = []
+    for item0 in raw_array:
+        obj_array = obj_array + find_coordinate_values(item0)
+    return obj_array
+
+
 def transform_latlng_to_lnglat(raw_array):
     obj_array = []
     for point in raw_array:
@@ -131,23 +146,7 @@ def transform_latlng_to_lnglat(raw_array):
     return obj_array
 
 
-def find_coordinate_list(target):
-    target_type = str(type(target))
-    if target_type.find('list') != -1:
-        item_count = len(target)
-        if item_count > 3:
-            return target
-        else:
-            for idx in range(item_count):
-                res = find_coordinate_list(target[idx])
-                if len(res) != 0:
-                    return res
-            return []
-    else:
-        return []
-
-
-def repack_and_save_data(park_code, json_array):
+def repack_and_save_data(park_code, park_dir, json_array):
     arr1 = json_array[1][6]
     coordinate_array = []
     stop = 0
@@ -183,18 +182,66 @@ def repack_and_save_data(park_code, json_array):
     export_json = json.dumps(lnglat_object_array)
     # print(export_json)
 
-    output = open(f'{output_dir}/{park_code}.json', 'w')
+    output = open(f'{park_dir}/google.coordinate.json', 'w')
     output.write(export_json)
     output.close()
 
     return total
 
 
-def file_exists_check(park_code):
-    return os.path.exists(f'{output_dir}/{park_code}.json')
+def get_park_coordinate(park):
+    _park_dir = join(base_dir, park.country_code, park.code)
+    if not exists(_park_dir):
+        makedirs(_park_dir)
+
+    _coordinate_file_path = join(_park_dir, 'google.pageData.json')
+    if exists(_coordinate_file_path):
+        return
+
+    _google_map_url = ''
+    _config_file_path = join(_park_dir, 'config.json')
+    if exists(_config_file_path):
+        _config_file = open(_config_file_path)
+        _read_park = json.load(_config_file, object_hook=Park)
+        _google_map_url = _read_park.google_map_url
+        _config_file.close()
+
+    if _google_map_url == '':
+        _google_map_url = get_google_map_address(park.country_code, park.code, park.course_url)
+        park.google_map_url = _google_map_url
+
+    # print(_google_map_url)
+    _encoded_json = get_google_route_coordinates(_google_map_url)
+    _decoded_json = demjson3.decode(_encoded_json)
+
+    _google_file = open(_coordinate_file_path, 'w')
+    _google_file.write(_decoded_json)
+    _google_file.close()
+
+    meters = repack_and_save_data(park.code, _park_dir, json.loads(_decoded_json))
+    park.google_coordinate_meter = round(meters, 2)
+
+    _config_file = open(_config_file_path, 'w')
+    _config_file.write(json.dumps(park.__dict__))
+    _config_file.close()
+
+
+def get_parks_coordinate(park_list):
+    park_size = len(park_list)
+    for idx in range(len(park_list)):
+        _park = park_list[idx]
+        try:
+            get_park_coordinate(_park)
+            print(f'[{idx}/{park_size}]route {_park.code} completed.')
+            # in case of google and parkrun website detected and block the program.
+            # time.sleep(1)
+        except Exception as ex:
+            print(f'[{idx}/{park_size}]route {_park.code} has ERROR: {ex}')
 
 
 if __name__ == '__main__':
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    get_park_coordinate()
+    if not exists(base_dir):
+        mkdir(base_dir)
+    # _park_dict = {'bairnsdale': 'https://www.parkrun.com.au/bairnsdale/course'}
+    _park_list = get_park_list()
+    get_parks_coordinate(_park_list)

@@ -66,7 +66,7 @@ def geodistance(point1, point2, unit='m'):
     if unit == 'km':
         distance = round(distance / 1000, 3)
     else:
-        distance = ceil(distance)
+        distance = round(distance, 2)  # 单位用米，保留2位小数
     return distance
 
 
