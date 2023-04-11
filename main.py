@@ -42,9 +42,9 @@ def get_park_coordinate():
         json_array = json.loads(decoded_json)
         total = repack_and_save_data(park_code, json_array)
 
-        print(f'route[{idx}/{park_size}] {park_code} found {total}meter coordinates.')
+        print(f'[{idx}/{park_size}]route {park_code} found {total} meter coordinates.')
         # in case of google and parkrun website detected and block the program.
-        time.sleep(1)
+        # time.sleep(1)
 
 
 def get_all_country_course_index():
