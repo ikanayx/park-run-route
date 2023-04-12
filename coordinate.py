@@ -4,38 +4,6 @@ from os import listdir, mkdir, path
 from os.path import isfile, isdir, join
 import json
 
-input_dir = "output"
-output_dir = "expansion"
-
-
-def load_coordinate():
-    idx = 0
-    json_files = listdir(input_dir)
-    for file_name in json_files:
-        idx = idx + 1
-        fullpath = join(input_dir, file_name)
-        if isdir(fullpath):
-            continue
-        if path.exists(f'{output_dir}/{file_name}'):
-            continue
-
-        file_open = open(fullpath, 'r')
-        json_string = file_open.read()
-        if json_string == '':
-            continue
-        file_open.close()
-
-        # 原坐标数组
-        coordinate_array = json.loads(json_string)
-        # 扩充后的数组
-        expansion_array = expand_coordinate(coordinate_array)
-        # 覆盖源文件
-        expand_file = open(f'{output_dir}/{file_name}', 'w')
-        expand_file.write(json.dumps(expansion_array))
-        expand_file.close()
-
-        print(f'[{idx}/{len(json_files)}] expand {file_name} finish.')
-
 
 def expand_coordinate(coordinate_array):
     if len(coordinate_array) == 0:
@@ -116,13 +84,3 @@ def update_delta_and_total(coordinate_array):
         curr['delta'] = meters
         curr['distance'] = total
 
-
-if __name__ == '__main__':
-    if not path.exists(output_dir):
-        mkdir(output_dir)
-    # pa = {'lng': 113.31474304199219, 'lat': 23.04990577697754, 'delta': 0, 'distance': 0}
-    # pb = {'lng': 113.3223648071289, 'lat': 23.049406051635742, 'delta': 0, 'distance': 0}
-    # pb['distance'] = pb['delta'] = geodistance(pa, pb)
-    # result = expand_coordinate([pa, pb])
-    # print(json.dumps(transform_to_mapbox(result)))
-    load_coordinate()
