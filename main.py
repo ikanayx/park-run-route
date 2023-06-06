@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from coordinate import update_delta_and_total, expand_coordinate
 from models.country import Country
 from models.park import Park
+from timezonefinder import TimezoneFinder
 
 headers = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -302,20 +303,50 @@ def deal_parks(park_list, force=False):
             print(f'[{idx}/{park_size}]route {_park.code} has ERROR: {ex}')
 
 
+# noinspection SqlDialectInspection,SqlNoDataSourceInspection
+def deal_parks_timezone(park_list):
+    park_size = len(park_list)
+    tf = TimezoneFinder()  # reuse
+
+    for idx in range(len(park_list)):
+        _park = park_list[idx]
+        try:
+            _park_dir = join(base_dir, _park.country_code, _park.code)
+            if not exists(_park_dir):
+                continue
+
+            _coordinate_file_path = join(_park_dir, coordinate_file_name)
+            if not exists(_coordinate_file_path) or stat(_coordinate_file_path).st_size == 0:
+                continue
+
+            _file = open(_coordinate_file_path, 'r')
+            _json_string = _file.read()
+            _file.close()
+            if _json_string == '':
+                continue
+            _coordinate = json.loads(_json_string)
+            _first = _coordinate[0]
+            tz = tf.timezone_at(lng=_first['lng'], lat=_first['lat'])  # 'Europe/Berlin'
+            print('update ai_preset_roadmap set timezone = \'' + tz + '\' where name = \'' + _park.code + '\';')
+
+        except Exception as ex:
+            print(f'[{idx}/{park_size}]route {_park.code} has ERROR: {ex}')
+
+
 if __name__ == '__main__':
     if not exists(base_dir):
         mkdir(base_dir)
     # _park_dict = {'bairnsdale': 'https://www.parkrun.com.au/bairnsdale/course'}
     _park_list = get_park_list()
     # deal_parks(_park_list)
+    deal_parks_timezone(_park_list)
 
-    _some_codes = ['rezerwatstrzelnica', 'aggeneys', 'wotton',
-                   'coppertrail', 'gayndahriverwalk', 'theoldrailtrail-juniors', 'thegrandcanalway', ]
-    _some = []
-    for _p in _park_list:
-        if _p.code in _some_codes:
-            _some.append(_p)
-    deal_parks(_some, force=True)
+    # _some_codes = ['momoiharappakoen', ]
+    # _some = []
+    # for _p in _park_list:
+    #     if _p.code in _some_codes:
+    #         _some.append(_p)
+    # deal_parks(_some, force=True)
 
     # pa = {'lng': 113.31474304199219, 'lat': 23.04990577697754, 'delta': 0, 'distance': 0}
     # pb = {'lng': 113.3223648071289, 'lat': 23.049406051635742, 'delta': 0, 'distance': 0}
